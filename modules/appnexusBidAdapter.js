@@ -73,6 +73,15 @@ export const spec = {
         .forEach(param => userObj[param] = userObjBid.params.user[param]);
     }
 
+    let rtdAppnexusSegments = spec.getRtdAppnexusSegments();
+    if (rtdAppnexusSegments) {
+      if (userObj['segments']) {
+        userObj['segments'] += rtdAppnexusSegments;
+      } else {
+        userObj['segments'] = rtdAppnexusSegments;
+      }
+    }
+
     const appDeviceObjBid = find(bidRequests, hasAppDeviceInfo);
     let appDeviceObj;
     if (appDeviceObjBid && appDeviceObjBid.params && appDeviceObjBid.params.app) {
@@ -306,6 +315,18 @@ export const spec = {
     if (bid.native) {
       reloadViewabilityScriptWithCorrectParameters(bid);
     }
+  },
+
+  getLocalStorageSafely: function(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch (e) {
+      return null;
+    }
+  },
+
+  getRtdAppnexusSegments: function() {
+    return spec.getLocalStorageSafely('rtd_appnexus_segs');
   }
 }
 
