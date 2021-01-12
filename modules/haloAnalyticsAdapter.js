@@ -11,6 +11,7 @@ import { getStorageManager } from '../src/storageManager.js';
 const HALO_ANALYTICS_URL = 'https://analytics.halo.ad.gt/api/v1/analytics'
 export const HALOID_LOCAL_NAME = 'auHaloId';
 const HALOID_ANALYTICS_VER = 0;
+const DEFAULT_PUBLISHER_ID = 0;
 
 export const storage = getStorageManager();
 
@@ -19,6 +20,8 @@ const analyticsName = 'Halo Analytics';
 
 var initOptions = null;
 var viewId = utils.generateUUID();
+
+var publisherId = DEFAULT_PUBLISHER_ID;
 
 var w = window;
 var d = document;
@@ -63,7 +66,38 @@ var _eventQueue = [
 var _startAuction = 0;
 var _bidRequestTimeout = 0;
 
-let haloAnalyticsModule = Object.assign(adapter({url: HALO_ANALYTICS_URL, analyticsType}), {
+let baseAdapter = adapter({url: HALO_ANALYTICS_URL, analyticsType: analyticsType});
+
+let haloAnalyticsModule = Object.assign({}, baseAdapter, {
+
+  enableAnalytics(conf = {}) {
+    let error = false;
+
+    if (typeof conf.options === 'object') {
+      if (conf.options.publisherId) {
+        publisherId = conf.options.publisherId;
+      }
+    } else {
+      utils.logError('Config not found.');
+      error = true;
+    }
+
+    if (!publisherId) {
+      utils.logError('Missing publisherId.');
+      error = true;
+    }
+
+    if (error) {
+      utils.logError('Not collecting data due to errors.');
+    } else {
+      baseAdapter.enableAnalytics.call(this, conf);
+    }
+  },
+
+  disableAnalytics() {
+    publisherId = DEFAULT_PUBLISHER_ID;
+  },
+
   track({eventType, args}) {
     handleEvent(eventType, args);
   }
@@ -74,7 +108,7 @@ function flush() {
     var data = {
       pageViewId: viewId,
       ver: HALOID_ANALYTICS_VER,
-      bundleId: initOptions.bundleId,
+      publisherId: publisherId,
       events: _eventQueue
     };
 
