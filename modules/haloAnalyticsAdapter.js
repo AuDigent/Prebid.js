@@ -10,13 +10,10 @@ import { getStorageManager } from '../src/storageManager.js';
  */
 const HALO_ANALYTICS_URL = 'https://analytics.halo.ad.gt/api/v1/analytics'
 export const HALOID_LOCAL_NAME = 'auHaloId';
-const HALOID_ANALYTICS_VER = 0;
+const HALOID_ANALYTICS_VER = 'pbadgt0';
 const DEFAULT_PUBLISHER_ID = 0;
 
 export const storage = getStorageManager();
-
-const analyticsType = 'endpoint';
-const analyticsName = 'Halo Analytics';
 
 var initOptions = null;
 var viewId = utils.generateUUID();
@@ -66,40 +63,110 @@ var _eventQueue = [
 var _startAuction = 0;
 var _bidRequestTimeout = 0;
 
-let baseAdapter = adapter({url: HALO_ANALYTICS_URL, analyticsType: analyticsType});
+let baseAdapter = adapter({analyticsType: 'endpoint'});
 
 let haloAnalyticsModule = Object.assign({}, baseAdapter, {
-
   enableAnalytics(conf = {}) {
-    let error = false;
-
     if (typeof conf.options === 'object') {
       if (conf.options.publisherId) {
         publisherId = conf.options.publisherId;
+      } else {
+        publisherId = DEFAULT_PUBLISHER_ID;
       }
     } else {
-      utils.logError('Config not found.');
-      error = true;
+      utils.logError('HALO_ANALYTICS_NO_CONFIG_ERROR');
+      return;
     }
 
-    if (!publisherId) {
-      utils.logError('Missing publisherId.');
-      error = true;
-    }
-
-    if (error) {
-      utils.logError('Not collecting data due to errors.');
-    } else {
-      baseAdapter.enableAnalytics.call(this, conf);
-    }
+    baseAdapter.enableAnalytics.call(this, conf);
   },
 
   disableAnalytics() {
     publisherId = DEFAULT_PUBLISHER_ID;
+    baseAdapter.disableAnalytics.apply(this, arguments);
   },
 
-  track({eventType, args}) {
-    handleEvent(eventType, args);
+  track({eventType, eventArgs}) {
+    eventArgs = eventArgs ? JSON.parse(JSON.stringify(eventArgs)) : {};
+    var data = {};
+
+    switch (eventType) {
+      case CONSTANTS.EVENTS.AUCTION_INIT: {
+        data = eventArgs;
+        _startAuction = data.timestamp;
+        _bidRequestTimeout = data.timeout;
+        break;
+      }
+
+      case CONSTANTS.EVENTS.AUCTION_END: {
+        data = eventArgs;
+        data.start = _startAuction;
+        data.end = Date.now();
+        break;
+      }
+
+      case CONSTANTS.EVENTS.BID_ADJUSTMENT: {
+        data.bidders = eventArgs;
+        break;
+      }
+
+      case CONSTANTS.EVENTS.BID_TIMEOUT: {
+        data.bidders = eventArgs;
+        data.duration = _bidRequestTimeout;
+        break;
+      }
+
+      case CONSTANTS.EVENTS.BID_REQUESTED: {
+        data = eventArgs;
+        break;
+      }
+
+      case CONSTANTS.EVENTS.BID_RESPONSE: {
+        data = eventArgs;
+        delete data.ad;
+        break;
+      }
+
+      case CONSTANTS.EVENTS.BID_WON: {
+        data = eventArgs;
+        delete data.ad;
+        delete data.adUrl;
+        break;
+      }
+
+      case CONSTANTS.EVENTS.BIDDER_DONE: {
+        data = eventArgs;
+        break;
+      }
+
+      case CONSTANTS.EVENTS.SET_TARGETING: {
+        data.targetings = eventArgs;
+        break;
+      }
+
+      case CONSTANTS.EVENTS.REQUEST_BIDS: {
+        data = eventArgs;
+        break;
+      }
+
+      case CONSTANTS.EVENTS.ADD_AD_UNITS: {
+        data = eventArgs;
+        break;
+      }
+
+      case CONSTANTS.EVENTS.AD_RENDER_FAILED: {
+        data = eventArgs;
+        break;
+      }
+
+      default:
+        return;
+    }
+
+    data.eventType = eventType;
+    data.timestamp = data.timestamp || Date.now();
+
+    sendEvent(data);
   }
 });
 
@@ -113,7 +180,7 @@ function flush() {
     };
 
     ajax(HALO_ANALYTICS_URL,
-      () => utils.logInfo(`${analyticsName} sent events batch`),
+      () => utils.logInfo('HALO_ANALYTICS_BATCH_SEND'),
       JSON.stringify(data),
       {
         contentType: 'application/json',
@@ -127,92 +194,9 @@ function flush() {
   }
 }
 
-function handleEvent(eventType, eventArgs) {
-  eventArgs = eventArgs ? JSON.parse(JSON.stringify(eventArgs)) : {};
-  var data = {};
-
-  switch (eventType) {
-    case CONSTANTS.EVENTS.AUCTION_INIT: {
-      data = eventArgs;
-      _startAuction = data.timestamp;
-      _bidRequestTimeout = data.timeout;
-      break;
-    }
-
-    case CONSTANTS.EVENTS.AUCTION_END: {
-      data = eventArgs;
-      data.start = _startAuction;
-      data.end = Date.now();
-      break;
-    }
-
-    case CONSTANTS.EVENTS.BID_ADJUSTMENT: {
-      data.bidders = eventArgs;
-      break;
-    }
-
-    case CONSTANTS.EVENTS.BID_TIMEOUT: {
-      data.bidders = eventArgs;
-      data.duration = _bidRequestTimeout;
-      break;
-    }
-
-    case CONSTANTS.EVENTS.BID_REQUESTED: {
-      data = eventArgs;
-      break;
-    }
-
-    case CONSTANTS.EVENTS.BID_RESPONSE: {
-      data = eventArgs;
-      delete data.ad;
-      break;
-    }
-
-    case CONSTANTS.EVENTS.BID_WON: {
-      data = eventArgs;
-      delete data.ad;
-      delete data.adUrl;
-      break;
-    }
-
-    case CONSTANTS.EVENTS.BIDDER_DONE: {
-      data = eventArgs;
-      break;
-    }
-
-    case CONSTANTS.EVENTS.SET_TARGETING: {
-      data.targetings = eventArgs;
-      break;
-    }
-
-    case CONSTANTS.EVENTS.REQUEST_BIDS: {
-      data = eventArgs;
-      break;
-    }
-
-    case CONSTANTS.EVENTS.ADD_AD_UNITS: {
-      data = eventArgs;
-      break;
-    }
-
-    case CONSTANTS.EVENTS.AD_RENDER_FAILED: {
-      data = eventArgs;
-      break;
-    }
-
-    default:
-      return;
-  }
-
-  data.eventType = eventType;
-  data.timestamp = data.timestamp || Date.now();
-
-  sendEvent(data);
-}
-
 function sendEvent(event) {
   _eventQueue.push(event);
-  utils.logInfo(`${analyticsName}Event ${event.eventType}:`, event);
+  utils.logInfo(`HALO_ANALYTICS_EVENT ${event.eventType} `, event);
 
   if (event.eventType === CONSTANTS.EVENTS.AUCTION_END) {
     flush();
