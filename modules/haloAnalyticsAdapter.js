@@ -8,6 +8,7 @@ import { getStorageManager } from '../src/storageManager.js';
 /**
  * haloAnalyticsAdapter.js - Audigent Halo Analytics Adapter
  */
+
 const HALO_ANALYTICS_URL = 'https://analytics.halo.ad.gt/api/v1/analytics'
 export const HALOID_LOCAL_NAME = 'auHaloId';
 const HALOID_ANALYTICS_VER = 'pbadgt0';
@@ -15,7 +16,6 @@ const DEFAULT_PUBLISHER_ID = 0;
 
 export const storage = getStorageManager();
 
-var initOptions = null;
 var viewId = utils.generateUUID();
 
 var publisherId = DEFAULT_PUBLISHER_ID;
@@ -45,117 +45,97 @@ export function getHaloId(callback) {
   }
 }
 
-var _pageView = {
+var pageView = {
   eventType: 'pageView',
   userAgent: window.navigator.userAgent,
   timestamp: Date.now(),
   timezoneOffset: new Date().getTimezoneOffset(),
   language: window.navigator.language,
   vendor: window.navigator.vendor,
+  pageUrl: window.top.location.href,
   screenWidth: x,
   screenHeight: y
 };
 
-var _eventQueue = [
-  _pageView
+var eventQueue = [
+  pageView
 ];
 
-var _startAuction = 0;
-var _bidRequestTimeout = 0;
+var startAuction = 0;
+var bidRequestTimeout = 0;
+let analyticsType = 'endpoint';
 
-let baseAdapter = adapter({analyticsType: 'endpoint'});
-
-let haloAnalyticsModule = Object.assign({}, baseAdapter, {
-  enableAnalytics(conf = {}) {
-    if (typeof conf.options === 'object') {
-      if (conf.options.publisherId) {
-        publisherId = conf.options.publisherId;
-      } else {
-        publisherId = DEFAULT_PUBLISHER_ID;
-      }
-    } else {
-      utils.logError('HALO_ANALYTICS_NO_CONFIG_ERROR');
-      return;
-    }
-
-    baseAdapter.enableAnalytics.call(this, conf);
-  },
-
-  disableAnalytics() {
-    publisherId = DEFAULT_PUBLISHER_ID;
-    baseAdapter.disableAnalytics.apply(this, arguments);
-  },
-
-  track({eventType, eventArgs}) {
-    eventArgs = eventArgs ? JSON.parse(JSON.stringify(eventArgs)) : {};
+let haloAnalyticsAdapter = Object.assign(adapter({url: HALO_ANALYTICS_URL, analyticsType}), {
+  track({eventType, args}) {
+    args = args ? JSON.parse(JSON.stringify(args)) : {};
     var data = {};
 
     switch (eventType) {
       case CONSTANTS.EVENTS.AUCTION_INIT: {
-        data = eventArgs;
-        _startAuction = data.timestamp;
-        _bidRequestTimeout = data.timeout;
+        data = args;
+        startAuction = data.timestamp;
+        bidRequestTimeout = data.timeout;
         break;
       }
 
       case CONSTANTS.EVENTS.AUCTION_END: {
-        data = eventArgs;
-        data.start = _startAuction;
+        data = args;
+        data.start = startAuction;
         data.end = Date.now();
         break;
       }
 
       case CONSTANTS.EVENTS.BID_ADJUSTMENT: {
-        data.bidders = eventArgs;
+        data.bidders = args;
         break;
       }
 
       case CONSTANTS.EVENTS.BID_TIMEOUT: {
-        data.bidders = eventArgs;
-        data.duration = _bidRequestTimeout;
+        data.bidders = args;
+        data.duration = bidRequestTimeout;
         break;
       }
 
       case CONSTANTS.EVENTS.BID_REQUESTED: {
-        data = eventArgs;
+        data = args;
         break;
       }
 
       case CONSTANTS.EVENTS.BID_RESPONSE: {
-        data = eventArgs;
+        data = args;
         delete data.ad;
         break;
       }
 
       case CONSTANTS.EVENTS.BID_WON: {
-        data = eventArgs;
+        data = args;
         delete data.ad;
         delete data.adUrl;
         break;
       }
 
       case CONSTANTS.EVENTS.BIDDER_DONE: {
-        data = eventArgs;
+        data = args;
         break;
       }
 
       case CONSTANTS.EVENTS.SET_TARGETING: {
-        data.targetings = eventArgs;
+        data.targetings = args;
         break;
       }
 
       case CONSTANTS.EVENTS.REQUEST_BIDS: {
-        data = eventArgs;
+        data = args;
         break;
       }
 
       case CONSTANTS.EVENTS.ADD_AD_UNITS: {
-        data = eventArgs;
+        data = args;
         break;
       }
 
       case CONSTANTS.EVENTS.AD_RENDER_FAILED: {
-        data = eventArgs;
+        data = args;
         break;
       }
 
@@ -170,13 +150,30 @@ let haloAnalyticsModule = Object.assign({}, baseAdapter, {
   }
 });
 
+haloAnalyticsAdapter.originEnableAnalytics = haloAnalyticsAdapter.enableAnalytics;
+
+haloAnalyticsAdapter.enableAnalytics = function(conf = {}) {
+  if (typeof conf.options === 'object') {
+    if (conf.options.publisherId) {
+      publisherId = conf.options.publisherId;
+    } else {
+      publisherId = DEFAULT_PUBLISHER_ID;
+    }
+  } else {
+    utils.logError('HALO_ANALYTICS_NO_CONFIG_ERROR');
+    return;
+  }
+
+  haloAnalyticsAdapter.originEnableAnalytics(conf);
+}
+
 function flush() {
-  if (_eventQueue.length > 1) {
+  if (eventQueue.length > 1) {
     var data = {
       pageViewId: viewId,
       ver: HALOID_ANALYTICS_VER,
       publisherId: publisherId,
-      events: _eventQueue
+      events: eventQueue
     };
 
     ajax(HALO_ANALYTICS_URL,
@@ -188,14 +185,14 @@ function flush() {
       }
     );
 
-    _eventQueue = [
-      _pageView
+    eventQueue = [
+      pageView
     ];
   }
 }
 
 function sendEvent(event) {
-  _eventQueue.push(event);
+  eventQueue.push(event);
   utils.logInfo(`HALO_ANALYTICS_EVENT ${event.eventType} `, event);
 
   if (event.eventType === CONSTANTS.EVENTS.AUCTION_END) {
@@ -204,14 +201,10 @@ function sendEvent(event) {
 }
 
 adapterManager.registerAnalyticsAdapter({
-  adapter: haloAnalyticsModule,
+  adapter: haloAnalyticsAdapter,
   code: 'halo'
 });
 
-haloAnalyticsModule.getOptions = function () {
-  return initOptions;
-};
+haloAnalyticsAdapter.flush = flush;
 
-haloAnalyticsModule.flush = flush;
-
-export default haloAnalyticsModule;
+export default haloAnalyticsAdapter;
