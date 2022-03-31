@@ -7,7 +7,7 @@
 
 import {ajax} from '../src/ajax.js';
 import {submodule} from '../src/hook.js';
-import * as utils from '../src/utils.js';
+import { logError, formatQS } from '../src/utils.js';
 import includes from 'core-js-pure/features/array/includes.js';
 
 const MODULE_NAME = 'verizonMediaId';
@@ -51,7 +51,7 @@ export const verizonMediaIdSubmodule = {
     const params = config.params || {};
     if (!params || typeof params.he !== 'string' ||
         (typeof params.pixelId === 'undefined' && typeof params.endpoint === 'undefined')) {
-      utils.logError('The verizonMediaId submodule requires the \'he\' and \'pixelId\' parameters to be defined.');
+      logError('The verizonMediaId submodule requires the \'he\' and \'pixelId\' parameters to be defined.');
       return;
     }
 
@@ -59,7 +59,7 @@ export const verizonMediaIdSubmodule = {
       '1p': includes([1, '1', true], params['1p']) ? '1' : '0',
       he: params.he,
       gdpr: isEUConsentRequired(consentData) ? '1' : '0',
-      euconsent: isEUConsentRequired(consentData) ? consentData.gdpr.consentString : '',
+      gdpr_consent: isEUConsentRequired(consentData) ? consentData.gdpr.consentString : '',
       us_privacy: consentData && consentData.uspConsent ? consentData.uspConsent : ''
     };
 
@@ -75,18 +75,18 @@ export const verizonMediaIdSubmodule = {
             try {
               responseObj = JSON.parse(response);
             } catch (error) {
-              utils.logError(error);
+              logError(error);
             }
           }
           callback(responseObj);
         },
         error: error => {
-          utils.logError(`${MODULE_NAME}: ID fetch encountered an error`, error);
+          logError(`${MODULE_NAME}: ID fetch encountered an error`, error);
           callback();
         }
       };
       const endpoint = VMCID_ENDPOINT.replace(PLACEHOLDER, params.pixelId);
-      let url = `${params.endpoint || endpoint}?${utils.formatQS(data)}`;
+      let url = `${params.endpoint || endpoint}?${formatQS(data)}`;
       verizonMediaIdSubmodule.getAjaxFn()(url, callbacks, null, {method: 'GET', withCredentials: true});
     };
     return {callback: resp};

@@ -1,4 +1,4 @@
-import * as utils from '../src/utils.js';
+import { isArray, generateUUID, deepAccess, isStr } from '../src/utils.js';
 import { registerBidder } from '../src/adapters/bidderFactory.js';
 import { config } from '../src/config.js';
 import { BANNER, VIDEO } from '../src/mediaTypes.js';
@@ -7,6 +7,7 @@ const BIDDER_CODE = 'districtmDMX';
 
 const DMXURI = 'https://dmx.districtm.io/b/v1';
 
+const GVLID = 144;
 const VIDEO_MAPPING = {
   playback_method: {
     'auto_play_sound_on': 1,
@@ -19,6 +20,8 @@ const VIDEO_MAPPING = {
 };
 export const spec = {
   code: BIDDER_CODE,
+  gvlid: GVLID,
+  aliases: ['dmx'],
   supportedFormat: [BANNER, VIDEO],
   supportedMediaTypes: [VIDEO, BANNER],
   isBidRequestValid(bid) {
@@ -27,7 +30,7 @@ export const spec = {
   interpretResponse(response, bidRequest) {
     response = response.body || {};
     if (response.seatbid) {
-      if (utils.isArray(response.seatbid)) {
+      if (isArray(response.seatbid)) {
         const { seatbid } = response;
         let winners = seatbid.reduce((bid, ads) => {
           let ad = ads.bid.reduce(function (oBid, nBid) {
@@ -39,9 +42,9 @@ export const spec = {
               nBid.requestId = nBid.impid;
               nBid.width = nBid.w || width;
               nBid.height = nBid.h || height;
-              nBid.ttl = 360;
+              nBid.ttl = 300;
               nBid.mediaType = bid.mediaTypes && bid.mediaTypes.video ? 'video' : 'banner';
-              if (nBid.mediaType) {
+              if (nBid.mediaType === 'video') {
                 nBid.vastXml = cleanVast(nBid.adm, nBid.nurl);
                 nBid.ttl = 3600;
               }
@@ -86,7 +89,7 @@ export const spec = {
     let timeout = config.getConfig('bidderTimeout');
     let schain = null;
     let dmxRequest = {
-      id: utils.generateUUID(),
+      id: generateUUID(),
       cur: ['USD'],
       tmax: (timeout - 300),
       test: this.test() || 0,
@@ -106,18 +109,17 @@ export const spec = {
 
     let eids = [];
     if (bidRequest[0] && bidRequest[0].userId) {
-      bindUserId(eids, utils.deepAccess(bidRequest[0], `userId.idl_env`), 'liveramp.com', 1);
-      bindUserId(eids, utils.deepAccess(bidRequest[0], `userId.id5id.uid`), 'id5-sync.com', 1);
-      bindUserId(eids, utils.deepAccess(bidRequest[0], `userId.pubcid`), 'pubcid.org', 1);
-      bindUserId(eids, utils.deepAccess(bidRequest[0], `userId.tdid`), 'adserver.org', 1);
-      bindUserId(eids, utils.deepAccess(bidRequest[0], `userId.criteoId`), 'criteo.com', 1);
-      bindUserId(eids, utils.deepAccess(bidRequest[0], `userId.britepoolid`), 'britepool.com', 1);
-      bindUserId(eids, utils.deepAccess(bidRequest[0], `userId.lipb.lipbid`), 'liveintent.com', 1);
-      bindUserId(eids, utils.deepAccess(bidRequest[0], `userId.intentiqid`), 'intentiq.com', 1);
-      bindUserId(eids, utils.deepAccess(bidRequest[0], `userId.lotamePanoramaId`), 'lotame.com', 1);
-      bindUserId(eids, utils.deepAccess(bidRequest[0], `userId.parrableId`), 'parrable.com', 1);
-      bindUserId(eids, utils.deepAccess(bidRequest[0], `userId.netId`), 'netid.de', 1);
-      bindUserId(eids, utils.deepAccess(bidRequest[0], `userId.sharedid`), 'sharedid.org', 1);
+      bindUserId(eids, deepAccess(bidRequest[0], `userId.idl_env`), 'liveramp.com', 1);
+      bindUserId(eids, deepAccess(bidRequest[0], `userId.id5id.uid`), 'id5-sync.com', 1);
+      bindUserId(eids, deepAccess(bidRequest[0], `userId.pubcid`), 'pubcid.org', 1);
+      bindUserId(eids, deepAccess(bidRequest[0], `userId.tdid`), 'adserver.org', 1);
+      bindUserId(eids, deepAccess(bidRequest[0], `userId.criteoId`), 'criteo.com', 1);
+      bindUserId(eids, deepAccess(bidRequest[0], `userId.britepoolid`), 'britepool.com', 1);
+      bindUserId(eids, deepAccess(bidRequest[0], `userId.lipb.lipbid`), 'liveintent.com', 1);
+      bindUserId(eids, deepAccess(bidRequest[0], `userId.intentiqid`), 'intentiq.com', 1);
+      bindUserId(eids, deepAccess(bidRequest[0], `userId.lotamePanoramaId`), 'lotame.com', 1);
+      bindUserId(eids, deepAccess(bidRequest[0], `userId.parrableId`), 'parrable.com', 1);
+      bindUserId(eids, deepAccess(bidRequest[0], `userId.netId`), 'netid.de', 1);
       dmxRequest.user = dmxRequest.user || {};
       dmxRequest.user.ext = dmxRequest.user.ext || {};
       dmxRequest.user.ext.eids = eids;
@@ -368,7 +370,7 @@ export function defaultSize(thebidObj) {
 }
 
 export function bindUserId(eids, value, source, atype) {
-  if (utils.isStr(value) && Array.isArray(eids)) {
+  if (isStr(value) && Array.isArray(eids)) {
     eids.push({
       source,
       uids: [
