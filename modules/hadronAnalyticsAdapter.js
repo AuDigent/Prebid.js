@@ -6,19 +6,19 @@ import CONSTANTS from '../src/constants.json';
 import { getStorageManager } from '../src/storageManager.js';
 
 /**
- * haloAnalyticsAdapter.js - Audigent Halo Analytics Adapter
+ * hadronAnalyticsAdapter.js - Audigent Hadron Analytics Adapter
  */
 
-const HALO_ANALYTICS_URL = 'https://analytics.halo.ad.gt/api/v1/analytics'
-export const HALOID_LOCAL_NAME = 'auHaloId';
-const HALOID_ANALYTICS_VER = 'pbadgt0';
-const DEFAULT_PUBLISHER_ID = 0;
+const HADRON_ANALYTICS_URL = 'https://analytics.hadron.ad.gt/api/v1/analytics'
+const HADRONID_ANALYTICS_VER = 'pbadgt0';
+const DEFAULT_PARTNER_ID = 0;
+const AU_GVLID = 561;
 
 export const storage = getStorageManager();
 
 var viewId = utils.generateUUID();
 
-var publisherId = DEFAULT_PUBLISHER_ID;
+var partnerId = DEFAULT_PARTNER_ID;
 
 var w = window;
 var d = document;
@@ -27,23 +27,6 @@ var g = d.getElementsByTagName('body')[0];
 var x = w.innerWidth || e.clientWidth || g.clientWidth;
 var y = w.innerHeight || e.clientHeight || g.clientHeight;
 
-export function getHaloId(callback) {
-  let haloId = storage.getDataFromLocalStorage(HALOID_LOCAL_NAME);
-  if (haloId) {
-    callback(haloId);
-  } else {
-    var script = document.createElement('script')
-    script.type = 'text/javascript';
-
-    script.onload = function() {
-      haloId = storage.getDataFromLocalStorage(HALOID_LOCAL_NAME);
-      callback(haloId);
-    }
-
-    script.src = 'https://id.halo.ad.gt/api/v1/haloid';
-    document.getElementsByTagName('head')[0].appendChild(script);
-  }
-}
 
 var pageView = {
   eventType: 'pageView',
@@ -65,7 +48,7 @@ var startAuction = 0;
 var bidRequestTimeout = 0;
 let analyticsType = 'endpoint';
 
-let haloAnalyticsAdapter = Object.assign(adapter({url: HALO_ANALYTICS_URL, analyticsType}), {
+let hadronAnalyticsAdapter = Object.assign(adapter({url: HADRON_ANALYTICS_URL, analyticsType}), {
   track({eventType, args}) {
     args = args ? JSON.parse(JSON.stringify(args)) : {};
     var data = {};
@@ -150,34 +133,36 @@ let haloAnalyticsAdapter = Object.assign(adapter({url: HALO_ANALYTICS_URL, analy
   }
 });
 
-haloAnalyticsAdapter.originEnableAnalytics = haloAnalyticsAdapter.enableAnalytics;
+hadronAnalyticsAdapter.originEnableAnalytics = hadronAnalyticsAdapter.enableAnalytics;
 
-haloAnalyticsAdapter.enableAnalytics = function(conf = {}) {
+hadronAnalyticsAdapter.enableAnalytics = function(conf = {}) {
   if (typeof conf.options === 'object') {
-    if (conf.options.publisherId) {
-      publisherId = conf.options.publisherId;
+    if (conf.options.partnerId) {
+      partnerId = conf.options.partnerId;
     } else {
-      publisherId = DEFAULT_PUBLISHER_ID;
+      partnerId = DEFAULT_PARTNER_ID;
     }
   } else {
-    utils.logError('HALO_ANALYTICS_NO_CONFIG_ERROR');
+    utils.logError('HADRON_ANALYTICS_NO_CONFIG_ERROR');
     return;
   }
 
-  haloAnalyticsAdapter.originEnableAnalytics(conf);
+  hadronAnalyticsAdapter.originEnableAnalytics(conf);
 }
 
 function flush() {
+  // Don't send anything if no partner id was declared
+  if (partnerId === DEFAULT_PARTNER_ID) return;
   if (eventQueue.length > 1) {
     var data = {
       pageViewId: viewId,
-      ver: HALOID_ANALYTICS_VER,
-      publisherId: publisherId,
+      ver: HADRONID_ANALYTICS_VER,
+      partnerId: partnerId,
       events: eventQueue
     };
 
-    ajax(HALO_ANALYTICS_URL,
-      () => utils.logInfo('HALO_ANALYTICS_BATCH_SEND'),
+    ajax(HADRON_ANALYTICS_URL,
+      () => utils.logInfo('HADRON_ANALYTICS_BATCH_SEND'),
       JSON.stringify(data),
       {
         contentType: 'application/json',
@@ -193,7 +178,7 @@ function flush() {
 
 function sendEvent(event) {
   eventQueue.push(event);
-  utils.logInfo(`HALO_ANALYTICS_EVENT ${event.eventType} `, event);
+  utils.logInfo(`HADRON_ANALYTICS_EVENT ${event.eventType} `, event);
 
   if (event.eventType === CONSTANTS.EVENTS.AUCTION_END) {
     flush();
@@ -201,10 +186,11 @@ function sendEvent(event) {
 }
 
 adapterManager.registerAnalyticsAdapter({
-  adapter: haloAnalyticsAdapter,
-  code: 'halo'
+  adapter: hadronAnalyticsAdapter,
+  code: 'hadronAnalytics',
+  gvlid: AU_GVLID
 });
 
-haloAnalyticsAdapter.flush = flush;
+hadronAnalyticsAdapter.flush = flush;
 
-export default haloAnalyticsAdapter;
+export default hadronAnalyticsAdapter;
