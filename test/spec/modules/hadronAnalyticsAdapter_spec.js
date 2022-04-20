@@ -11,6 +11,7 @@ describe('Hadron analytics adapter', () => {
     hadronAnalyticsAdapter.enableAnalytics({
       options: {
         partnerId: 12349,
+        eventsToTrack: ['auctionEnd'],
       }
     });
   });
@@ -45,6 +46,7 @@ describe('Hadron analytics adapter', () => {
       }],
     };
     events.emit(constants.EVENTS.AUCTION_END, auction);
+    assert(server.requests.length > 0)
     const body = JSON.parse(server.requests[0].requestBody);
     var eventTypes = [];
     body.events.forEach(e => eventTypes.push(e.eventType));
