@@ -19,6 +19,7 @@ export const storage = getStorageManager();
 var viewId = utils.generateUUID();
 
 var partnerId = DEFAULT_PARTNER_ID;
+var eventsToTrack = [];
 
 var w = window;
 var d = document;
@@ -26,7 +27,6 @@ var e = d.documentElement;
 var g = d.getElementsByTagName('body')[0];
 var x = w.innerWidth || e.clientWidth || g.clientWidth;
 var y = w.innerHeight || e.clientHeight || g.clientHeight;
-
 
 var pageView = {
   eventType: 'pageView',
@@ -52,7 +52,7 @@ let hadronAnalyticsAdapter = Object.assign(adapter({url: HADRON_ANALYTICS_URL, a
   track({eventType, args}) {
     args = args ? JSON.parse(JSON.stringify(args)) : {};
     var data = {};
-
+    if (!eventsToTrack.includes(eventType)) return;
     switch (eventType) {
       case CONSTANTS.EVENTS.AUCTION_INIT: {
         data = args;
@@ -141,6 +141,9 @@ hadronAnalyticsAdapter.enableAnalytics = function(conf = {}) {
       partnerId = conf.options.partnerId;
     } else {
       partnerId = DEFAULT_PARTNER_ID;
+    }
+    if (conf.options.eventsToTrack) {
+      eventsToTrack = conf.options.eventsToTrack;
     }
   } else {
     utils.logError('HADRON_ANALYTICS_NO_CONFIG_ERROR');
