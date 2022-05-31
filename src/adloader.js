@@ -10,7 +10,11 @@ const _approvedLoadExternalJSList = [
   'adagio',
   'browsi',
   'brandmetrics',
-  'justtag'
+  'justtag',
+  'akamaidap',
+  'ftrackId',
+  'inskin',
+  'hadron'
 ]
 
 /**
