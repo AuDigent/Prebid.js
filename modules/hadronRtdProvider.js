@@ -165,7 +165,7 @@ export function getRealTimeData(bidConfig, onDone, rtdConfig, userConsent) {
     }
   }
 
-  const userIds = typeof getGlobal().getUserIds === 'function' ? (getGlobal()).getUserIds() : {};
+  const userIds = {};
 
   let hadronId = storage.getDataFromLocalStorage(HALOID_LOCAL_NAME);
   if (isStr(hadronId)) {
